@@ -14,12 +14,11 @@
 --create_colortable <r_steps> <g_steps> <b_steps> <extreme> <nodename> Creates a color table, each <nodename> node is assigned to a color 
 --save_colortable <r_steps> <g_steps> <b_steps> <extreme> <nodename> <save_as> Same as above, but saves the color table as .anl
 --Register-Functions : 
---Note : , Color : Red : ..., Green : ..., Blue : ... is appended to the description automatically
+--Note : , Color : Red : ..., Green : ..., Blue : ... is appended to the description automatically, #color in the tile/inventory/wield-image string is replaced with the color, if not specified, appended automatically
 --register_all_nodes <r_steps> <g_steps> <b_steps> <a> <extreme> <nodename> <node(data)> <generate_crafts> <append> <save_as> 
 --1. Append specifies whether the color should be applied to the drop, drop should be registered in same colors, except if you want to make the nodes drop themselves. Only works if a drop is specified in <node(data)>
 --2. If save_as is set this function offers save_colortable functionality besides its normal
 --register_all_items <r_steps> <g_steps> <b_steps> <a> <extreme> <itemname> <item(data)> <generate_crafts>
-
 
 HEX = {"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "A", "B", "C", "D", "E", "F"}
 local function toHex(number) --Converts a number from 0-255 into a hexadecimal string
@@ -58,7 +57,7 @@ function create_colortable(r_steps, g_steps, b_steps, extreme, nodename) --Creat
             	local red=r_step*r
             	local blue=b_step*b
             	local green=g_step*g
-                local register_as="colorful:"..nodename.."_"..red.."_"..green.."_"..blue
+                local register_as=nodename.."_"..red.."_"..green.."_"..blue
                 t[red..","..green..","..blue]=register_as
             end
         end
@@ -92,7 +91,7 @@ function save_colortable(r_steps, g_steps, b_steps, extreme, nodename, save_as) 
             	local red=r_step*r
             	local blue=b_step*b
             	local green=g_step*g
-                local register_as="colorful:"..nodename.."_"..red.."_"..green.."_"..blue
+                local register_as=nodename.."_"..red.."_"..green.."_"..blue
                 if save_as then
 		            result=result.."\n"..red..","..green..","..blue..",255-"..register_as
                 end
@@ -143,7 +142,11 @@ function register_all_nodes(r_steps, g_steps, b_steps, a, extreme, nodename, nod
     	            copied_table[key]=value
                 end
             	for index, tile in pairs(node["tiles"]) do
-                    tiles_colorized[index]=tile.."^[colorize:#"..color
+            		if not string.match(tile,"#color") then
+                        tiles_colorized[index]=tile.."^[colorize:#"..color
+                    else 
+                        tiles_colorized[index]=string.gsub(tile,"#color","^[colorize:#"..color)
+                    end
                 end
                 if append then 
                     if type(node["drop"])=="table" then
@@ -157,8 +160,33 @@ function register_all_nodes(r_steps, g_steps, b_steps, a, extreme, nodename, nod
                     end
                 end
                 copied_table["tiles"]=tiles_colorized
-                copied_table["description"]=node["description"]..", Color : Red : "..red..", Green : "..green..", Blue : "..blue
-                local register_as="colorful:"..nodename.."_"..red.."_"..green.."_"..blue
+                if copied_table["inventory_image"] then
+                	if not string.match(copied_table["inventory_image"],"#color") then
+                        copied_table["inventory_image"]=copied_table["inventory_image"].."^[colorize:#"..color
+                    else 
+                        copied_table["inventory_image"]=string.gsub(copied_table["inventory_image"],"#color","^[colorize:#"..color)
+                    end
+                end
+            	if copied_table["wield_image"] then
+            	    if not string.match(copied_table["wield_image"],"#color") then
+                        copied_table["wield_image"]=copied_table["wield_image"].."^[colorize:#"..color
+                    else 
+                        copied_table["wield_image"]=string.gsub(copied_table["wield_image"],"#color","^[colorize:#"..color)
+                    end
+                end
+                if copied_table["description"] then
+            	    if not string.match(copied_table["description"],"#color") then
+                        copied_table["description"]=copied_table["description"]..node["description"]..", Color : Red : "..red..", Green : "..green..", Blue : "..blue
+                    else 
+                        copied_table["description"]=string.gsub(copied_table["description"],"#color",", Color : Red : "..red..", Green : "..green..", Blue : "..blue)
+                    end
+                end
+                local register_as=nil
+                if not string.match(nodename,"#color") then
+                    register_as=nodename.."_"..red.."_"..green.."_"..blue
+                else
+                    register_as=string.gsub(nodename, "#color", red.."_"..green.."_"..blue)
+                end
                 minetest.register_node(register_as, copied_table)
                 if save_as then
 		            result=result.."\n"..red..","..green..","..blue..",255-"..register_as
@@ -171,7 +199,7 @@ function register_all_nodes(r_steps, g_steps, b_steps, a, extreme, nodename, nod
                         local blue_value=round((tonumber(splut[3])+blue)/2/g_step)*g_step
                         minetest.register_craft({
 	               		    type = "shapeless",
-	                	    output = "colorful:"..nodename.."_"..red_value.."_"..green_value.."_"..blue_value.." 2",
+	                	    output = nodename.."_"..red_value.."_"..green_value.."_"..blue_value.." 2",
 							recipe = {name, register_as},
 						})
                     end
@@ -220,17 +248,36 @@ function register_all_items(r_steps, g_steps, b_steps, a, extreme, itemname, ite
             	local color=toHex(red)..toHex(green)..toHex(blue)..alpha
             	local tiles_colorized={}
             	local copied_table={}
-            	local register_as="colorful:"..itemname.."_"..red.."_"..green.."_"..blue
                 for key, value in ipairs(item) do
     	            copied_table[key]=value
                 end
-            	copied_table["inventory_image"]=item["inventory_image"].."^[colorize:#"..color
-            	if copied_table["wield_image"] then
-            	    copied_table["wield_image"]=item["wield_image"].."^[colorize:#"..color
-                else
-                    copied_table["wield_image"]=item["inventory_image"].."^[colorize:#"..color
+            	if copied_table["inventory_image"] then
+                    if not string.match(copied_table["inventory_image"],"#color") then
+                        copied_table["inventory_image"]=copied_table["inventory_image"].."^[colorize:#"..color
+                    else 
+                        copied_table["inventory_image"]=string.gsub(copied_table["inventory_image"],"#color","^[colorize:#"..color)
+                    end
                 end
-                copied_table["description"]=item["description"]..", Color : Red : "..red..", Green : "..green..", Blue : "..blue
+                if copied_table["wield_image"] then
+                    if not string.match(copied_table["wield_image"],"#color") then
+                        copied_table["wield_image"]=copied_table["wield_image"].."^[colorize:#"..color
+                    else 
+                        copied_table["wield_image"]=string.gsub(copied_table["wield_image"],"#color","^[colorize:#"..color)
+                    end
+                end
+                if copied_table["description"] then
+            	    if not string.match(copied_table["description"],"#color") then
+                        copied_table["description"]=copied_table["description"]..node["description"]..", Color : Red : "..red..", Green : "..green..", Blue : "..blue
+                    else 
+                        copied_table["description"]=string.gsub(copied_table["description"],"#color",", Color : Red : "..red..", Green : "..green..", Blue : "..blue)
+                    end
+                end
+                local register_as=nil
+                if not string.match(nodename,"#color") then
+                    register_as=itemname.."_"..red.."_"..green.."_"..blue
+                else
+                    register_as=string.gsub(nodename, "#color", red.."_"..green.."_"..blue)
+                end
                 minetest.register_craftitem(register_as, copied_table)
                 if generate_crafts then
                     for color_value, name in pairs(items) do
@@ -240,7 +287,7 @@ function register_all_items(r_steps, g_steps, b_steps, a, extreme, itemname, ite
                         local blue_value=round((tonumber(splut[3])+blue)/2/g_step)*g_step
                         minetest.register_craft({
 	               		    type = "shapeless",
-	                	    output = "colorful:"..itemname.."_"..red_value.."_"..green_value.."_"..blue_value.." 2",
+	                	    output = itemname.."_"..red_value.."_"..green_value.."_"..blue_value.." 2",
 							recipe = {name, register_as},
 						})
                     end
@@ -249,19 +296,3 @@ function register_all_items(r_steps, g_steps, b_steps, a, extreme, itemname, ite
         end
     end
 end
-
---[[register_all_items(2,2,2, 100, true, "colored_paper", { --Colored Paper, specs out of default/craftitems.lua
-	description = "Paper",
-	inventory_image = "default_paper.png",
-}, true)]]
-
-
---[[register_all_nodes(4,4,4, 100, true, "colored_stone" , { --Colored Stone, specs out of default/nodes.lua
-	description = "Stone",
-	tiles = {"default_stone.png"},
-	is_ground_content = true,
-	groups = {cracky=3, stone=1},
-	drop = "colorful:colored_stone",
-	legacy_mineral = true,
-	sounds = default.node_sound_stone_defaults()
-}, true, true , "colored_stone.anl" --[[Saves an .anl file]]--[[)]]
